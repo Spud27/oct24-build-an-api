@@ -56,6 +56,17 @@ def create_student():
 
 # Update - PUSH /students/<int:student_id>
 # Delete - DELETE /students/<int:student_id>
+@students_bp.route('/students/<int:student_id>', methods=['DELETE'])
+def delete_student(student_id):
+    stmt = db.select(Student).filter_by(id=student_id)
+    student = db.session.scalar(stmt)
+    if student:
+        db.session.delete(student)
+        db.session.commit()
+        return {}, 204
+    else:
+        return {'error': f'Student with id {student_id} does not exist'}, 404
+    
 
 # Possible extra routes
 # Enrol - POST /students/<int:student_id>/<int:course_id>
