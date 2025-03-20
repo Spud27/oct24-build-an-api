@@ -11,7 +11,7 @@ students_bp = Blueprint('students', __name__)
 @students_bp.route('/students')
 def get_all_students():
     # Create the SQL statment
-    stmt = db.select(Student)
+    stmt = db.select(Student).order_by(Student.name)
     # Execute the SQL statement
     students = db.session.scalars(stmt)
     return many_students.dump(students)
@@ -48,13 +48,40 @@ def create_student():
     except IntegrityError as err:
         if err.orig.pgcode == errorcodes.UNIQUE_VIOLATION:
             return {"error": "Email address already in use"}, 409 # Conflict
-        elif err.ori.pgcode == errorcodes.NOT_NULL_VIOLATION:
-            return {"error": "Field is required"}, 400
+        # elif err.ori.pgcode == errorcodes.NOT_NULL_VIOLATION:
+        #     return {"error": str(err.orig)}, 400
         else:
-            return {"error": err._message()}, 400
+            return {"error": str(err.orig)}, 400
 
 
 # Update - PUSH /students/<int:student_id>
+@students_bp.route('/students/<int:student_id>', methods=['PUT', 'PATCH'])
+def update_student(student_id):
+    try:
+        # Fetch the student by id
+        stmt = db.select(Student).filter_by(id=student_id)
+        student = db.session.scalar(stmt)
+        if student:
+            # Get the incoming request body (JSON)
+            data = student_without_id.load(request.json)            
+            # Update the attr of the student with the incoming data
+            student.name = data.get('name') or student.name # short-circuit with Boolean operators
+            student.email = data.get('email') or student.email
+            student.address = data.get('address', student.address) # or you can provide a second parimetre on .get() as the default
+            # Commit the session
+            db.session.commit()
+            # Return the new Student instance
+            return one_student.dump(student), 200
+        else:
+            return {'error': f'Student with id {student_id} does not exist'}, 404
+    except IntegrityError as err:
+        if err.orig.pgcode == errorcodes.UNIQUE_VIOLATION:
+            return {"error": "Email address already in use"}, 409 # Conflict
+        # elif err.ori.pgcode == errorcodes.NOT_NULL_VIOLATION:
+        #     return {"error": str(err.orig)}, 400
+        else:
+            return {"error": str(err.orig)}, 400
+
 # Delete - DELETE /students/<int:student_id>
 @students_bp.route('/students/<int:student_id>', methods=['DELETE'])
 def delete_student(student_id):
